@@ -1,0 +1,70 @@
+---
+- hosts: all
+  remote_user: root
+  vars:
+    http_port: 8080
+    rtmp_port: 1935
+    www_root: "/srv/www"
+    rtmp_application_name: "show"
+    deny_direct_play: "yes"
+
+  tasks:
+    - name: Package installation
+      apt:
+        name: 
+          - nginx-full 
+          - libnginx-mod-rtmp 
+          - git
+          - curl 
+          - less
+          - vim-nox 
+          - htop
+          - slurm
+        state: present
+        update_cache: yes
+
+    - name: Remove Apache if installed
+      apt:
+        name: 
+          - apache2
+          - apache2-* 
+        state: absent
+
+    - name: Stop and Disable NGINX for the configuration 
+      service:
+        name: nginx 
+        state: stopped
+        enabled: no
+    
+    - name: Remove default configuration 
+      file:
+        path: "{{ item }}"
+        state: absent 
+      loop:
+        - /etc/nginx/sites-available/default
+        - /etc/nginx/sites-enabled/default
+
+    - file:
+        src: /usr/share/nginx/modules-available/mod-rtmp.conf
+        dest: /etc/nginx/modules-enabled/50-mod-rtmp.conf
+        state: link 
+
+    - file:
+        path: /etc/nginx/nginx.conf
+        state: absent
+
+    - template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        mode: '0644'
+        owner: root
+        group: root
+    - command: /usr/sbin/nginx -t -c /etc/nginx/nginx.conf 
+      register: nginx_check
+#      ignore_errors: yes
+
+    - name:  Start and enable NGINX 
+      service:
+        name: nginx 
+        state: started
+        enabled: yes

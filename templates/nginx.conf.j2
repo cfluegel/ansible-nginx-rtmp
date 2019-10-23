@@ -1,0 +1,88 @@
+user www-data;
+include /etc/nginx/modules-enabled/*.conf;
+worker_processes  auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+# RTMP configuration
+rtmp {
+    server {
+        listen {{ rtmp_port }}; # Listen on standard RTMP port
+        chunk_size 4000;
+
+        application {{ rtmp_application_name }} {
+            live on;
+
+            # Turn on HLS
+            hls on;
+            hls_path {{ www_root }}/hls/;
+            hls_fragment 3;
+            hls_playlist_length 60;
+
+            allow publish 185.243.68.0/22;
+            allow publish 46.59.215.227/32;
+            deny publish all;
+
+            {% if deny_direct_play == 'yes' %}
+            # disable consuming the stream from nginx as rtmp
+            deny play all;
+            {% endif %}
+
+        }
+        access_log /var/log/nginx/rtmp-access.log;
+    }
+}
+
+http {
+    sendfile off;
+    tcp_nopush on;
+    tcp_nodelay on; 
+    # aio on;
+    directio 512;
+    
+    # keepalive_timeout 65; 
+    # gzip on;
+    
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # include /etc/nginx/conf.d/*.conf;
+
+    server {
+        listen {{ http_port }};
+        root {{ www_root }};
+
+        default_type text/html;
+        index index.html;
+
+        location /hls {
+            # Disable cache
+            add_header 'Cache-Control' 'no-cache';
+
+            # CORS setup
+            add_header 'Access-Control-Allow-Origin' '*' always;
+            add_header 'Access-Control-Expose-Headers' 'Content-Length';
+
+            # allow CORS preflight requests
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '*';
+                add_header 'Access-Control-Max-Age' 1728000;
+                add_header 'Content-Type' 'text/plain charset=UTF-8';
+                add_header 'Content-Length' 0;
+                return 204;
+            }
+
+            types {
+                application/dash+xml mpd;
+                application/vnd.apple.mpegurl m3u8;
+                video/mp2t ts;
+            }
+
+        }
+    }
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+}
