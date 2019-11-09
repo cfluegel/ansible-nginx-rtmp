@@ -5,8 +5,18 @@
     http_port: 8080
     rtmp_port: 1935
     www_root: "/srv/www"
-    rtmp_application_name: "show"
     deny_direct_play: "yes"
+
+    with_transcode: yes
+    transcode_crf_global: 29
+    # transcode_crf_low: 29
+    transcode_crf_mid: 23 
+    # transcode_crf_high: 29
+    # transcode_crf_hd720: 29
+    transcode_low: "no"    # 480
+    transcode_mid: "yes"   # 720
+    transcode_high: "no"   # 960 
+    transcode_hd720: "no"  # 1280
 
   tasks:
     - name: Package installation
@@ -20,6 +30,9 @@
           - vim-nox 
           - htop
           - slurm
+          - ffmpeg
+          - libavcodec-extra 
+          - libavfilter-extra
         state: present
         update_cache: yes
 
@@ -36,7 +49,7 @@
         state: stopped
         enabled: no
     
-    - name: Remove default configuration 
+    - name: Remove site-* directories 
       file:
         path: "{{ item }}"
         state: absent 
@@ -44,24 +57,48 @@
         - /etc/nginx/sites-available/default
         - /etc/nginx/sites-enabled/default
 
-    - file:
+    - name: Make sure the rtmp mod is enabled 
+      file:
         src: /usr/share/nginx/modules-available/mod-rtmp.conf
         dest: /etc/nginx/modules-enabled/50-mod-rtmp.conf
         state: link 
 
-    - file:
+    - name: Remove the nginx.conf file 
+      file:
         path: /etc/nginx/nginx.conf
         state: absent
 
-    - template:
+    - name: Use nginx.conf without transcode option
+      template:
         src: nginx.conf.j2
         dest: /etc/nginx/nginx.conf
         mode: '0644'
         owner: root
         group: root
-    - command: /usr/sbin/nginx -t -c /etc/nginx/nginx.conf 
+      when: not with_transcode
+
+    - name: Use nginx.conf with transcode option
+      template:
+        src: nginx-with-transcoding.conf.j2
+        dest: /etc/nginx/nginx.conf
+        mode: '0644'
+        owner: root
+        group: root
+      when: with_transcode
+
+    - name: Copy stat.xsl file to the web root
+      copy:
+        src: stat.xsl
+        dest: "{{ www_root }}/stat.xsl" 
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Test the configuration 
+      command: /usr/sbin/nginx -t -c /etc/nginx/nginx.conf 
       register: nginx_check
-#      ignore_errors: yes
+      # Ignore errors and fail in another way maybe
+      # ignore_errors: yes
 
     - name:  Start and enable NGINX 
       service:

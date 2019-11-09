@@ -1,6 +1,6 @@
 user www-data;
 include /etc/nginx/modules-enabled/*.conf;
-worker_processes  auto;
+worker_processes  1;
 pid /run/nginx.pid;
 
 events {
@@ -13,7 +13,7 @@ rtmp {
         listen {{ rtmp_port }}; # Listen on standard RTMP port
         chunk_size 4000;
 
-        application {{ rtmp_application_name }} {
+        application show {
             live on;
 
             # Turn on HLS
@@ -31,8 +31,8 @@ rtmp {
             deny play all;
             {% endif %}
 
+            access_log /var/log/nginx/rtmp-access.log;
         }
-        access_log /var/log/nginx/rtmp-access.log;
     }
 }
 
@@ -81,6 +81,13 @@ http {
                 video/mp2t ts;
             }
 
+        }
+        location /stats {
+            rtmp_stat all;
+
+            # Use this stylesheet to view XML as web page
+            # in browser
+            rtmp_stat_stylesheet /stat.xsl;
         }
     }
     access_log /var/log/nginx/access.log;
