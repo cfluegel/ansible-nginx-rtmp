@@ -89,6 +89,9 @@ http {
             # in browser
             rtmp_stat_stylesheet /stat.xsl;
         }
+        location /control {
+            rtmp_control all;
+        }
     }
     access_log /var/log/nginx/access.log;
     error_log /var/log/nginx/error.log;
