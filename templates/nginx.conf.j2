@@ -17,7 +17,10 @@ rtmp {
             live on;
             deny play all;
             push rtmp://127.0.0.1:1935/hls-live;
-            
+
+            # Stream Check and rewrite in case of a streaming key
+            # on_publish http://127.0.0.1:5000/publish-check;
+
             access_log /var/log/nginx/rtmp-access-ingest.log;
         }
 
